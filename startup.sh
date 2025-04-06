@@ -10,7 +10,7 @@ import os
 from utils import download_model_if_needed
 
 MODEL_ID = 'Wan-AI/Wan2.1-I2V-14B-480P'
-MODEL_CACHE_DIR = '/spinvol/models/wan21'
+MODEL_CACHE_DIR = '/runpod-volume/models/wan21'
 
 print(f'Ensuring model {MODEL_ID} is downloaded...')
 download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)

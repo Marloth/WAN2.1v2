@@ -27,8 +27,8 @@ if "CUDA_VISIBLE_DEVICES" not in os.environ:
 
 # Global variables
 MODEL_ID = "Wan-AI/Wan2.1-I2V-14B-480P"
-# Use the new storage volume with more space
-MODEL_CACHE_DIR = "/spinvol/models/wan21"
+# Use the default network volume path
+MODEL_CACHE_DIR = "/runpod-volume/models/wan21"
 
 def handler(job):
     """
