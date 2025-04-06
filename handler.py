@@ -70,19 +70,22 @@ def handler(job):
             # Set up the command to run the official generate.py script
             generate_script = "/wan21/wan2_repo/generate.py"
             
-            # Build the command - use the proper args for the official script
+            # Build the command using the official Wan2.1 parameters from documentation
             cmd = [
                 "python", generate_script,
-                "--task", "i2v-14B", 
+                "--task", "i2v-14B",  # Specify the I2V-14B task
                 "--size", size,
                 "--ckpt_dir", MODEL_CACHE_DIR,
                 "--image", input_image_path,
                 "--prompt", prompt,
-                "--steps", str(num_inference_steps),
-                "--out_dir", output_dir,
-                "--no_sr",  # No super-resolution for speed
-                "--save_frames"  # Save individual frames
+                "--num_frames", "17",  # Fixed number of frames
+                "--save_frames",  # Save individual frames
+                "--out_dir", output_dir
             ]
+            
+            # Add optional parameters if provided
+            if num_inference_steps:
+                cmd.extend(["--steps", str(num_inference_steps)])
             
             if negative_prompt:
                 cmd.extend(["--negative_prompt", negative_prompt])
