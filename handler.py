@@ -70,7 +70,8 @@ def handler(job):
             # Set up the command to run the official generate.py script
             generate_script = "/wan21/wan2_repo/generate.py"
             
-            # Build the command exactly matching the example from documentation
+            # Build the command EXACTLY as shown in Wan2.1 documentation
+            # https://github.com/Wan-Video/Wan2.1#run-image-to-video-generation
             cmd = [
                 "python", generate_script,
                 "--task", "i2v-14B",
@@ -78,7 +79,6 @@ def handler(job):
                 "--ckpt_dir", MODEL_CACHE_DIR,
                 "--image", input_image_path,
                 "--prompt", prompt,
-                "--use_prompt_extend", "False",
                 "--save_frames",
                 "--out_dir", output_dir
             ]
@@ -92,33 +92,77 @@ def handler(job):
             
             # Run the official Wan2.1 generate script
             logger.info(f"Running generate command: {' '.join(cmd)}")
-            process = subprocess.run(cmd, capture_output=True, text=True)
             
-            if process.returncode != 0:
-                error_msg = process.stderr or "Unknown error running generation"
-                logger.error(f"Error running generation: {error_msg}")
-                return {"error": error_msg}
+            try:
+                # Use Popen to capture output in real-time
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                
+                # Log output in real-time
+                stdout_lines = []
+                stderr_lines = []
+                
+                # Read and log stdout
+                for line in process.stdout:
+                    logger.info(f"STDOUT: {line.strip()}")
+                    stdout_lines.append(line)
+                    
+                # Read and log stderr
+                for line in process.stderr:
+                    logger.error(f"STDERR: {line.strip()}")
+                    stderr_lines.append(line)
+                    
+                # Wait for process to complete
+                return_code = process.wait()
+                
+                if return_code != 0:
+                    error_msg = ''.join(stderr_lines) or "Unknown error running generation"
+                    logger.error(f"Process failed with return code {return_code}: {error_msg}")
+                    return {"error": error_msg}
+                    
+                logger.info(f"Process completed successfully with return code {return_code}")
+                
+            except Exception as e:
+                logger.error(f"Exception running command: {str(e)}")
+                return {"error": f"Exception running command: {str(e)}"}
             
-            # Find the generated frame images (they should be in the output directory)
+            # According to documentation, Wan2.1 I2V generates exactly 17 frames
+            # For details, check output_dir and subdirectories
             logger.info(f"Looking for generated frames in: {output_dir}")
-            frame_paths = sorted(glob.glob(os.path.join(output_dir, "*.png")))
             
-            # Also check parent directory and subdirectories in case frames are saved elsewhere
-            if not frame_paths:
-                logger.info("No frames found in output directory, checking parent directory")
-                frame_paths = sorted(glob.glob(os.path.join(os.path.dirname(output_dir), "*.png")))
+            # Document the contents of the output directory
+            if os.path.exists(output_dir):
+                logger.info(f"Output directory exists. Contents: {os.listdir(output_dir)}")
+                
+                # Check for subdirectories like 'frames' or 'output'
+                for subdir in os.listdir(output_dir):
+                    subdir_path = os.path.join(output_dir, subdir)
+                    if os.path.isdir(subdir_path):
+                        logger.info(f"Subdirectory {subdir} contents: {os.listdir(subdir_path)}")
+            else:
+                logger.error(f"Output directory does not exist: {output_dir}")
+                
+            # Search for frame files using a recursive pattern (official implementation might save to subdirectories)
+            frames_search_patterns = [
+                os.path.join(output_dir, "*.png"),                  # direct in output_dir
+                os.path.join(output_dir, "frames", "*.png"),        # common 'frames' subdirectory
+                os.path.join(output_dir, "output", "*.png"),        # common 'output' subdirectory
+                os.path.join(output_dir, "**", "*.png")             # any subdirectory (recursive)
+            ]
+            
+            frame_paths = []
+            for pattern in frames_search_patterns:
+                logger.info(f"Searching for frames with pattern: {pattern}")
+                found_frames = glob.glob(pattern, recursive=True)
+                if found_frames:
+                    logger.info(f"Found {len(found_frames)} frames with pattern {pattern}")
+                    frame_paths.extend(found_frames)
+                    break
+                    
+            # Sort frames numerically (assuming frame_0001.png format)
+            frame_paths = sorted(frame_paths)
             
             if not frame_paths:
-                logger.info("No frames found in parent directory, checking subdirectories")
-                for root, dirs, files in os.walk(output_dir):
-                    for file in files:
-                        if file.endswith(".png"):
-                            frame_paths.append(os.path.join(root, file))
-                frame_paths = sorted(frame_paths)
-            
-            if not frame_paths:
-                logger.info(f"Directory contents of {output_dir}: {os.listdir(output_dir) if os.path.exists(output_dir) else 'directory does not exist'}")
-                logger.info(f"Directory contents of parent: {os.listdir(os.path.dirname(output_dir)) if os.path.exists(os.path.dirname(output_dir)) else 'directory does not exist'}")
+                logger.error("No frames were found in any location")
                 return {"error": "No frames were generated"}
             
             logger.info(f"Found {len(frame_paths)} generated frames at: {frame_paths[0] if frame_paths else 'None'}")
