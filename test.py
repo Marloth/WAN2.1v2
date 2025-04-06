@@ -24,7 +24,7 @@ payload = {
 }
 
 # Initialize the endpoint
-endpoint = runpod.Endpoint("5y1ko00m9048uu")
+endpoint = runpod.Endpoint("as5r5kpe2z61ts")
 
 # Send the request to your endpoint
 response = endpoint.run(payload)

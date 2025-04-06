@@ -20,7 +20,8 @@ def ensure_dependencies():
         'imageio',
         'imageio-ffmpeg',
         'av',
-        'clip'
+        'clip',
+        'dashscope'
     ]
     
     for package in required_packages:
