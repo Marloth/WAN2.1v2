@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir pillow numpy opencv-python ffmpeg-python
 
 # Install the requirements from the Wan2.1 repo
-RUN cd /wan21/wan2_repo && \
-    pip install --no-cache-dir -e .
+RUN cd /wan21/wan2_repo
+RUN pip install --no-cache-dir -e .
 
 # Copy application files
 COPY handler.py .
