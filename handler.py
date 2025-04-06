@@ -5,9 +5,11 @@ import base64
 import runpod
 import tempfile
 import logging
+import subprocess
+import glob
 from io import BytesIO
 from PIL import Image
-from utils import download_model_if_needed, create_video_from_frames
+from utils import download_model_if_needed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,40 +23,24 @@ os.environ["HF_HOME"] = "/runpod-volume/cache"
 MODEL_ID = "Wan-AI/Wan2.1-I2V-14B-480P"
 MODEL_CACHE_DIR = "/runpod-volume/models/wan21"
 
-# Model will be loaded on first request
-model = None
+# No need to keep the model in memory since we're using the official script
 
-def load_model():
-    """Load the WAN2.1 model from persistent storage."""
-    logger.info("Loading WAN2.1 model...")
-    start_time = time.time()
-    
-    # Import here to reduce cold start time
-    from diffusers import DiffusionPipeline
+def check_model():
+    """Check if the WAN2.1 model is available in persistent storage."""
+    logger.info("Checking for WAN2.1 model...")
     
     # Make sure model is in persistent storage
     download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)
     
-    # Load model in FP16 for better memory efficiency
-    pipe = DiffusionPipeline.from_pretrained(
-        MODEL_CACHE_DIR, 
-        torch_dtype=torch.float16,
-        local_files_only=True
-    )
-    pipe.to("cuda")
-    
-    logger.info(f"Model loaded successfully in {time.time() - start_time:.2f} seconds")
-    return pipe
+    logger.info(f"Model check completed successfully")
+    return True
 
 def handler(event):
     """
-    RunPod handler function that processes image-to-video generation requests.
+    RunPod handler function that processes image-to-video generation requests using official Wan2.1 implementation.
     """
-    global model
-    
-    # Load model if not already loaded
-    if model is None:
-        model = load_model()
+    # Make sure model is in persistent storage
+    check_model()
     
     try:
         start_time = time.time()
@@ -70,66 +56,99 @@ def handler(event):
         # Extract parameters
         prompt = job_input.get("prompt", "")
         negative_prompt = job_input.get("negative_prompt", "poor quality, distortion")
-        num_frames = job_input.get("num_frames", 16)
-        fps = job_input.get("fps", 8)
         num_inference_steps = job_input.get("num_inference_steps", 25)
+        size = job_input.get("size", "512*512")
         
         # Process input image
         logger.info("Decoding input image...")
         image_base64 = job_input["image"]
         image_data = base64.b64decode(image_base64)
-        init_image = Image.open(BytesIO(image_data)).convert("RGB")
         
-        # Ensure image has appropriate dimensions
-        orig_width, orig_height = init_image.size
-        if init_image.width % 8 != 0 or init_image.height % 8 != 0:
-            # Resize to nearest multiple of 8
-            width = (init_image.width // 8) * 8
-            height = (init_image.height // 8) * 8
-            init_image = init_image.resize((width, height))
-            logger.info(f"Resized image from {orig_width}x{orig_height} to {width}x{height}")
-        
-        # Generate video frames
-        logger.info(f"Generating video with {num_frames} frames...")
-        with torch.autocast("cuda"):
-            result = model(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                image=init_image,
-                num_inference_steps=num_inference_steps,
-                num_frames=num_frames,
-            )
-        
-        logger.info(f"Video frames generated in {time.time() - start_time:.2f} seconds")
-        
-        # Create temporary directory for output
+        # Create a temporary directory for processing
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Get the generated frames
-            frames = result.frames[0]  # WAN2.1 returns frames in this format
+            # Save the input image
+            input_image_path = os.path.join(temp_dir, "input_image.jpg")
+            with open(input_image_path, "wb") as f:
+                f.write(image_data)
             
-            logger.info(f"Creating video file with {len(frames)} frames at {fps} fps...")
+            # Output directory for frames
+            output_dir = os.path.join(temp_dir, "output")
+            os.makedirs(output_dir, exist_ok=True)
             
-            # Create a video file from the frames
-            output_path = os.path.join(temp_dir, f"output_{int(time.time())}.mp4")
-            create_video_from_frames(frames, output_path, fps)
+            # Set up the command to run the official generate.py script
+            generate_script = "/wan21/wan2_repo/generate.py"
             
-            # Read and encode the video file
-            with open(output_path, "rb") as video_file:
-                video_bytes = video_file.read()
-                video_base64 = base64.b64encode(video_bytes).decode("utf-8")
-                logger.info(f"Video encoded to base64, size: {len(video_base64) // 1024} KB")
+            # Build the command
+            cmd = [
+                "python", generate_script,
+                "--task", "i2v-14B", 
+                "--size", size,
+                "--ckpt_dir", MODEL_CACHE_DIR,
+                "--image", input_image_path,
+                "--prompt", prompt,
+                "--num_inference_steps", str(num_inference_steps),
+                "--num_frames", "17",  # Always use 17 frames
+                "--output_dir", output_dir
+            ]
+            
+            if negative_prompt:
+                cmd.extend(["--negative_prompt", negative_prompt])
+            
+            # Run the official Wan2.1 generate script
+            logger.info(f"Running generate command: {' '.join(cmd)}")
+            process = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if process.returncode != 0:
+                error_msg = process.stderr or "Unknown error running generation"
+                logger.error(f"Error running generation: {error_msg}")
+                return {"error": error_msg}
+            
+            # Find the generated frame images (they should be in the output directory)
+            frame_paths = sorted(glob.glob(os.path.join(output_dir, "*.png")))
+            
+            if not frame_paths:
+                return {"error": "No frames were generated"}
+            
+            logger.info(f"Found {len(frame_paths)} generated frames")
+            
+            # Ensure we have exactly 17 frames by padding or truncating
+            if len(frame_paths) < 17:
+                logger.warning(f"Only got {len(frame_paths)} frames, will pad to 17 frames")
+                # We'll handle this in the frame encoding loop
+            elif len(frame_paths) > 17:
+                logger.warning(f"Got {len(frame_paths)} frames, truncating to 17 frames")
+                frame_paths = frame_paths[:17]
+            
+            # Encode each frame as base64 PNG
+            frame_images = []
+            
+            # First encode all available frames
+            for frame_path in frame_paths:
+                with open(frame_path, "rb") as f:
+                    frame_data = f.read()
+                    img_str = base64.b64encode(frame_data).decode("utf-8")
+                    frame_images.append(img_str)
+            
+            # If we have fewer than 17 frames, duplicate the last frame
+            if len(frame_images) < 17:
+                last_frame = frame_images[-1]
+                while len(frame_images) < 17:
+                    frame_images.append(last_frame)
+            
+            logger.info(f"Encoded {len(frame_images)} PNG frames to base64")
         
         # Return the results
         total_time = time.time() - start_time
         logger.info(f"Request processed successfully in {total_time:.2f} seconds")
         
         return {
-            "video_base64": video_base64,
+            "frames": frame_images,
+            "frame_count": len(frame_images),
             "parameters": {
                 "prompt": prompt,
                 "negative_prompt": negative_prompt,
-                "num_frames": num_frames,
-                "fps": fps,
+                "num_frames": 17,  # Always 17 frames
+                "size": size,
                 "num_inference_steps": num_inference_steps
             },
             "metrics": {

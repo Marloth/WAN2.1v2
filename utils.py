@@ -1,7 +1,6 @@
 import os
 import tempfile
 import subprocess
-from huggingface_hub import snapshot_download
 import logging
 
 # Configure logging
@@ -26,16 +25,21 @@ def download_model_if_needed(model_id, cache_dir):
         logger.info(f"Model not found in persistent storage. Downloading {model_id} to {cache_dir}...")
         os.makedirs(cache_dir, exist_ok=True)
         
-        # Download model from Hugging Face
+        # Download model from Hugging Face using huggingface-cli
         try:
-            snapshot_download(
-                repo_id=model_id,
-                local_dir=cache_dir,
-                local_dir_use_symlinks=False
-            )
+            cmd = [
+                "huggingface-cli", "download",
+                model_id,
+                "--local-dir", cache_dir
+            ]
+            
+            # Run the huggingface-cli command
+            process = subprocess.run(cmd, check=True, capture_output=True, text=True)
             logger.info(f"Model downloaded successfully to {cache_dir}")
-        except Exception as e:
-            logger.error(f"Error downloading model: {str(e)}")
+            logger.debug(process.stdout)
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr if e.stderr else str(e)
+            logger.error(f"Error downloading model: {error_msg}")
             raise
     else:
         logger.info(f"Model already exists in persistent storage at {cache_dir}")

@@ -6,16 +6,27 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /app
+WORKDIR /wan21
+
+# Clone the Wan2.1 repository
+RUN git clone https://github.com/Wan-Video/Wan2.1.git /wan21/wan2_repo
 
 # Install Python dependencies
 COPY requirements.txt .
+# Ensure torch >= 2.4.0
 RUN pip3 install --no-cache-dir -r requirements.txt
+# Install dependencies from the cloned repo
+RUN pip3 install --no-cache-dir -r /wan21/wan2_repo/requirements.txt
 RUN pip3 install --no-cache-dir runpod
+RUN pip3 install --no-cache-dir "huggingface_hub[cli]"
 
 # Copy application files
 COPY handler.py .
 COPY utils.py .
+COPY startup.sh .
+
+# Make startup script executable
+RUN chmod +x startup.sh
 
 # Create directories for persistent storage
 RUN mkdir -p /runpod-volume/models/wan21
@@ -26,5 +37,5 @@ ENV PYTHONUNBUFFERED=1
 ENV TRANSFORMERS_CACHE="/runpod-volume/cache"
 ENV HF_HOME="/runpod-volume/cache"
 
-# Default command
-CMD ["python3", "-m", "runpod.serverless.start"]
+# Use startup script as entrypoint (will download model if needed)
+CMD ["/wan21/startup.sh"]
