@@ -1,54 +1,45 @@
 import os
-import time
-import torch
+import sys
 import base64
-import runpod
-import tempfile
-import logging
+import shutil
 import subprocess
-import glob
-from io import BytesIO
+import json
+import tempfile
+import time
 from PIL import Image
+import io
+import uuid
+import runpod
 from utils import download_model_if_needed
+import glob
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Set cache directories to use persistent storage
-os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume/cache"
-os.environ["HF_HOME"] = "/runpod-volume/cache"
+# Set environment variables
+os.environ["PYTHONPATH"] = f"{os.environ.get('PYTHONPATH', '')}:/wan21/wan2_repo"
+
+# If CUDA_VISIBLE_DEVICES isn't set, set it to 0
+if "CUDA_VISIBLE_DEVICES" not in os.environ:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Global variables
 MODEL_ID = "Wan-AI/Wan2.1-I2V-14B-480P"
 # Use the new storage volume with more space
 MODEL_CACHE_DIR = "/spinvol/models/wan21"
 
-# No need to keep the model in memory since we're using the official script
-
-def check_model():
-    """Check if the WAN2.1 model is available in persistent storage."""
-    logger.info("Checking for WAN2.1 model...")
-    
-    # Make sure model is in persistent storage
-    download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)
-    
-    logger.info(f"Model check completed successfully")
-    return True
-
-def handler(event):
+def handler(job):
     """
     RunPod handler function that processes image-to-video generation requests using official Wan2.1 implementation.
     """
-    # Make sure model is in persistent storage
-    check_model()
-    
     try:
         start_time = time.time()
         logger.info("Processing request...")
         
         # Get input parameters with defaults
-        job_input = event["input"]
+        job_input = job["input"]
         
         # Validate required inputs
         if "image" not in job_input:
@@ -79,7 +70,7 @@ def handler(event):
             # Set up the command to run the official generate.py script
             generate_script = "/wan21/wan2_repo/generate.py"
             
-            # Build the command
+            # Build the command - use the proper args for the official script
             cmd = [
                 "python", generate_script,
                 "--task", "i2v-14B", 
@@ -87,9 +78,10 @@ def handler(event):
                 "--ckpt_dir", MODEL_CACHE_DIR,
                 "--image", input_image_path,
                 "--prompt", prompt,
-                "--num_inference_steps", str(num_inference_steps),
-                "--num_frames", "17",  # Always use 17 frames
-                "--output_dir", output_dir
+                "--steps", str(num_inference_steps),
+                "--out_dir", output_dir,
+                "--no_sr",  # No super-resolution for speed
+                "--save_frames"  # Save individual frames
             ]
             
             if negative_prompt:
@@ -170,5 +162,12 @@ def handler(event):
             "traceback": error_traceback
         }
 
-# Start the serverless function
-runpod.serverless.start({"handler": handler})
+# This is the proper way to start a RunPod serverless handler
+if __name__ == "__main__":
+    # Check if model is available before starting server
+    logger.info("Ensuring model is downloaded before starting serverless handler...")
+    download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)
+    logger.info("Model check completed, starting serverless handler")
+    
+    # Start the serverless worker with our handler
+    runpod.serverless.start({"handler": handler})

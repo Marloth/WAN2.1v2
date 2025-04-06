@@ -17,6 +17,7 @@ download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)
 print('Model check completed successfully.')
 "
 
-# We don't need to start the runpod serverless handler here anymore
-# It will be started by the CMD in the Dockerfile
+# Start the handler using the proper serverless approach
+echo "Starting RunPod serverless handler..."
+exec python3 /wan21/handler.py
 

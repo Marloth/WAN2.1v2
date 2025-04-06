@@ -44,9 +44,8 @@ ENV PYTHONUNBUFFERED=1
 ENV TRANSFORMERS_CACHE="/runpod-volume/cache"
 ENV HF_HOME="/runpod-volume/cache"
 
-# Fix for the runpod serverless module not found issue
+# Use the latest version of runpod
 RUN pip install runpod --upgrade
-RUN pip list | grep runpod
 
-# Use startup script as entrypoint (will download model if needed)
-CMD ["python3", "-m", "runpod.serverless.start"]
+# Use startup script as entrypoint (will download model and start the handler)
+CMD ["/wan21/startup.sh"]
