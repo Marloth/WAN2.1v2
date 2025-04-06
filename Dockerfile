@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -8,15 +8,22 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /wan21
 
-# Clone the Wan2.1 repository
+# Wan2.1 repository already cloned above
+
+# Clone the Wan2.1 repository first to get their requirements
 RUN git clone https://github.com/Wan-Video/Wan2.1.git /wan21/wan2_repo
 
-# Install Python dependencies
+# Install Python dependencies (with verbose output for debugging)
 COPY requirements.txt .
-# Ensure torch >= 2.4.0
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install PyTorch for CUDA 12.1 explicitly
+RUN pip3 install --no-cache-dir torch==2.4.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install our custom requirements without torch (which we just installed)
+RUN grep -v "torch\|torchvision" requirements.txt > filtered_requirements.txt || true
+RUN cat filtered_requirements.txt
+RUN pip3 install --no-cache-dir -r filtered_requirements.txt || (cat /tmp/pip-log.txt && false)
 # Install dependencies from the cloned repo
-RUN pip3 install --no-cache-dir -r /wan21/wan2_repo/requirements.txt
+RUN cat /wan21/wan2_repo/requirements.txt
+RUN pip3 install --no-cache-dir -r /wan21/wan2_repo/requirements.txt || (cat /tmp/pip-log.txt && false)
 RUN pip3 install --no-cache-dir runpod
 RUN pip3 install --no-cache-dir "huggingface_hub[cli]"
 
