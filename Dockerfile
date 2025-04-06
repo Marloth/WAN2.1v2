@@ -16,7 +16,7 @@ RUN git clone https://github.com/Wan-Video/Wan2.1.git /wan21/wan2_repo
 
 # Install Python dependencies in a single step to reduce layers
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir runpod "huggingface_hub[cli]" && \
+    pip install --no-cache-dir "runpod>=1.0.0" "huggingface_hub[cli]" && \
     pip install --no-cache-dir transformers diffusers accelerate safetensors && \
     pip install --no-cache-dir pillow numpy opencv-python ffmpeg-python
 
@@ -44,5 +44,9 @@ ENV PYTHONUNBUFFERED=1
 ENV TRANSFORMERS_CACHE="/runpod-volume/cache"
 ENV HF_HOME="/runpod-volume/cache"
 
+# Fix for the runpod serverless module not found issue
+RUN pip install runpod --upgrade
+RUN pip list | grep runpod
+
 # Use startup script as entrypoint (will download model if needed)
-CMD ["/wan21/startup.sh"]
+CMD ["python3", "-m", "runpod.serverless.start"]
