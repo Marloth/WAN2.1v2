@@ -70,20 +70,20 @@ def handler(job):
             # Set up the command to run the official generate.py script
             generate_script = "/wan21/wan2_repo/generate.py"
             
-            # Build the command using the official Wan2.1 parameters from documentation
+            # Build the command exactly matching the example from documentation
             cmd = [
                 "python", generate_script,
-                "--task", "i2v-14B",  # Specify the I2V-14B task
+                "--task", "i2v-14B",
                 "--size", size,
                 "--ckpt_dir", MODEL_CACHE_DIR,
                 "--image", input_image_path,
                 "--prompt", prompt,
-                "--num_frames", "17",  # Fixed number of frames
-                "--save_frames",  # Save individual frames
+                "--use_prompt_extend", "False",
+                "--save_frames",
                 "--out_dir", output_dir
             ]
             
-            # Add optional parameters if provided
+            # Add steps parameter if provided (optional)
             if num_inference_steps:
                 cmd.extend(["--steps", str(num_inference_steps)])
             
@@ -100,12 +100,28 @@ def handler(job):
                 return {"error": error_msg}
             
             # Find the generated frame images (they should be in the output directory)
+            logger.info(f"Looking for generated frames in: {output_dir}")
             frame_paths = sorted(glob.glob(os.path.join(output_dir, "*.png")))
             
+            # Also check parent directory and subdirectories in case frames are saved elsewhere
             if not frame_paths:
+                logger.info("No frames found in output directory, checking parent directory")
+                frame_paths = sorted(glob.glob(os.path.join(os.path.dirname(output_dir), "*.png")))
+            
+            if not frame_paths:
+                logger.info("No frames found in parent directory, checking subdirectories")
+                for root, dirs, files in os.walk(output_dir):
+                    for file in files:
+                        if file.endswith(".png"):
+                            frame_paths.append(os.path.join(root, file))
+                frame_paths = sorted(frame_paths)
+            
+            if not frame_paths:
+                logger.info(f"Directory contents of {output_dir}: {os.listdir(output_dir) if os.path.exists(output_dir) else 'directory does not exist'}")
+                logger.info(f"Directory contents of parent: {os.listdir(os.path.dirname(output_dir)) if os.path.exists(os.path.dirname(output_dir)) else 'directory does not exist'}")
                 return {"error": "No frames were generated"}
             
-            logger.info(f"Found {len(frame_paths)} generated frames")
+            logger.info(f"Found {len(frame_paths)} generated frames at: {frame_paths[0] if frame_paths else 'None'}")
             
             # Ensure we have exactly 17 frames by padding or truncating
             if len(frame_paths) < 17:
