@@ -1,8 +1,9 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# Use the NVIDIA PyTorch container as base image - already has PyTorch installed
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn8-runtime
 
-# Install system dependencies
+# Install minimal system dependencies required for Wan2.1 and OpenCV
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip git wget ffmpeg libsm6 libxext6 \
+    git ffmpeg libsm6 libxext6 libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -13,19 +14,15 @@ WORKDIR /wan21
 # Clone the Wan2.1 repository first to get their requirements
 RUN git clone https://github.com/Wan-Video/Wan2.1.git /wan21/wan2_repo
 
-# Install Python dependencies (with verbose output for debugging)
-COPY requirements.txt .
-# Install PyTorch for CUDA 12.1 explicitly
-RUN pip3 install --no-cache-dir torch==2.4.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-# Install our custom requirements without torch (which we just installed)
-RUN grep -v "torch\|torchvision" requirements.txt > filtered_requirements.txt || true
-RUN cat filtered_requirements.txt
-RUN pip3 install --no-cache-dir -r filtered_requirements.txt || (cat /tmp/pip-log.txt && false)
-# Install dependencies from the cloned repo
-RUN cat /wan21/wan2_repo/requirements.txt
-RUN pip3 install --no-cache-dir -r /wan21/wan2_repo/requirements.txt || (cat /tmp/pip-log.txt && false)
-RUN pip3 install --no-cache-dir runpod
-RUN pip3 install --no-cache-dir "huggingface_hub[cli]"
+# Install Python dependencies in a single step to reduce layers
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir runpod "huggingface_hub[cli]" && \
+    pip install --no-cache-dir transformers diffusers accelerate safetensors && \
+    pip install --no-cache-dir pillow numpy opencv-python ffmpeg-python
+
+# Install the requirements from the Wan2.1 repo
+RUN cd /wan21/wan2_repo && \
+    pip install --no-cache-dir -e .
 
 # Copy application files
 COPY handler.py .
