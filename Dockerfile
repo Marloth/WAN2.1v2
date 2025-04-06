@@ -35,8 +35,9 @@ COPY startup.sh .
 RUN chmod +x startup.sh
 
 # Create directories for persistent storage
-RUN mkdir -p /runpod-volume/models/wan21
 RUN mkdir -p /runpod-volume/cache
+# Create directory for the new storage volume (will be mounted at runtime)
+RUN mkdir -p /spinvol/models/wan21
 
 # Set environment variables for cache locations
 ENV PYTHONUNBUFFERED=1

@@ -21,7 +21,8 @@ os.environ["HF_HOME"] = "/runpod-volume/cache"
 
 # Global variables
 MODEL_ID = "Wan-AI/Wan2.1-I2V-14B-480P"
-MODEL_CACHE_DIR = "/runpod-volume/models/wan21"
+# Use the new storage volume with more space
+MODEL_CACHE_DIR = "/spinvol/models/wan21"
 
 # No need to keep the model in memory since we're using the official script
 
