@@ -1,5 +1,5 @@
 # Use the NVIDIA PyTorch container as base image - already has PyTorch installed
-FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
 
 # Install minimal system dependencies required for Wan2.1 and OpenCV
 RUN apt-get update && apt-get install -y \
