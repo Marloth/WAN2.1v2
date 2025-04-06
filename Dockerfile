@@ -21,9 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir pillow numpy opencv-python ffmpeg-python
 
 # Install the requirements from the Wan2.1 repo
-RUN if [ -f /wan21/wan2_repo/requirements.txt ]; then \
-    pip install --no-cache-dir -r /wan21/wan2_repo/requirements.txt; \
-    fi
+RUN pip install --no-cache-dir -r /wan21/wan2_repo/requirements.txt || echo "Could not install Wan2.1 requirements, continuing anyway"
 
 # Add Wan2.1 repo to PYTHONPATH so we can import from it
 ENV PYTHONPATH="${PYTHONPATH}:/wan21/wan2_repo"
