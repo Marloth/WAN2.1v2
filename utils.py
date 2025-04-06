@@ -2,10 +2,48 @@ import os
 import tempfile
 import subprocess
 import logging
+import sys
+import importlib
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def ensure_dependencies():
+    """
+    Check for and install required dependencies if they're missing.
+    """
+    required_packages = [
+        'easydict',
+        'einops',
+        'torch-fidelity',
+        'imageio',
+        'imageio-ffmpeg',
+        'av',
+        'clip'
+    ]
+    
+    for package in required_packages:
+        try:
+            # Try to import the package
+            importlib.import_module(package.replace('-', '_'))
+            logger.info(f"✅ {package} is already installed")
+        except ImportError:
+            # If import fails, install the package
+            logger.info(f"⚠️ {package} is missing, installing...")
+            
+            # Special case for CLIP which requires git installation
+            if package == 'clip':
+                pip_cmd = "git+https://github.com/openai/CLIP.git"
+            else:
+                pip_cmd = package
+                
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", pip_cmd])
+                logger.info(f"✅ Successfully installed {package}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"❌ Failed to install {package}: {str(e)}")
+                # Continue trying other packages rather than failing completely
 
 def download_model_if_needed(model_id, cache_dir):
     """

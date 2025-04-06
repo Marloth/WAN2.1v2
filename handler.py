@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import uuid
 import runpod
-from utils import download_model_if_needed
+from utils import download_model_if_needed, ensure_dependencies
 import glob
 import logging
 
@@ -164,6 +164,11 @@ def handler(job):
 
 # This is the proper way to start a RunPod serverless handler
 if __name__ == "__main__":
+    # Check and install any missing dependencies
+    logger.info("Checking for required dependencies...")
+    ensure_dependencies()
+    logger.info("Dependency check completed")
+    
     # Check if model is available before starting server
     logger.info("Ensuring model is downloaded before starting serverless handler...")
     download_model_if_needed(MODEL_ID, MODEL_CACHE_DIR)
