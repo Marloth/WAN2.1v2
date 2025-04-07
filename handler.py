@@ -86,7 +86,6 @@ def handler(job):
                 "--ckpt_dir", MODEL_CACHE_DIR,
                 "--image", input_image_path,
                 "--prompt", prompt,
-                "--use_prompt_extend", "False",
                 "--save_file", os.path.join(output_dir, "frame_%04d.png")  # Use --save_file instead of --save_frames and --out_dir
             ]
             
