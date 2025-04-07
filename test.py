@@ -19,12 +19,12 @@ payload = {
         "prompt": "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard.",
         "negative_prompt": "poor quality, distortion, blurry",
         "num_inference_steps": 25,
-        "size": "512*512"
+        "size": "480*832"
     }
 }
 
 # Initialize the endpoint
-endpoint = runpod.Endpoint("6otlsxcgj5xvyu")
+endpoint = runpod.Endpoint("csqe1svpi7y3df")
 
 # Send the request to your endpoint
 response = endpoint.run(payload)
