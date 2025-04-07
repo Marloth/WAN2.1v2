@@ -21,7 +21,8 @@ def ensure_dependencies():
         'imageio-ffmpeg',
         'av',
         'clip',
-        'dashscope'
+        'dashscope',
+        'flash-attn>=2.0.0,<3.0.0'  # Flash Attention 2.x is required by Wan2.1
     ]
     
     for package in required_packages:

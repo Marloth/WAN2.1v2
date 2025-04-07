@@ -20,6 +20,15 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir transformers diffusers accelerate safetensors && \
     pip install --no-cache-dir pillow numpy opencv-python ffmpeg-python
 
+# Install required Python packages and build dependencies for flash-attn
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Flash Attention 2 first (it's a complex dependency)
+RUN pip install --no-cache-dir flash-attn>=2.0.0,<3.0.0 --no-build-isolation
+
 # Explicitly install required Wan2.1 dependencies
 RUN pip install --no-cache-dir easydict einops av torch-fidelity imageio imageio-ffmpeg git+https://github.com/openai/CLIP.git
 

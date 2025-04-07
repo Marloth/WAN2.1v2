@@ -16,7 +16,7 @@ with open("image.webp", "rb") as image_file:
 payload = {
     "input": {
         "image": image_data,
-        "prompt": "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard.",
+        "prompt": "Zombie walking",
         "negative_prompt": "poor quality, distortion, blurry",
         "num_inference_steps": 25,
         "size": "480*832"
@@ -24,7 +24,7 @@ payload = {
 }
 
 # Initialize the endpoint
-endpoint = runpod.Endpoint("dok0c0lahgdmx6")
+endpoint = runpod.Endpoint("m865sbtr1fary1")
 
 # Send the request to your endpoint
 response = endpoint.run(payload)
